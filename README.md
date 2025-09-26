@@ -79,3 +79,71 @@ def preprocess_text(text):
     return " ".join(tokens)
 
 processed_comments = comments.apply(preprocess_text)
+
+
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.decomposition import NMF
+
+vectorizer = TfidfVectorizer(max_df=0.95, min_df=2, stop_words='english')
+tfidf = vectorizer.fit_transform(processed_comments)
+
+num_topics = 5
+nmf_model = NMF(n_components=num_topics, random_state=1, max_iter=1000)
+nmf_model.fit(tfidf)
+
+def display_topics(model, feature_names, no_top_words):
+    for topic_idx, topic in enumerate(model.components_):
+        print(f"Topic {topic_idx+1}:")
+        print(" ".join([feature_names[i] for i in topic.argsort()[:-no_top_words - 1:-1]]))
+
+no_top_words = 10
+feature_names = vectorizer.get_feature_names_out()
+display_topics(nmf_model, feature_names, no_top_words)
+
+from sklearn.feature_extraction.text import CountVectorizer
+
+def get_top_ngrams(corpus, n, top_k=10):
+    vec = CountVectorizer(ngram_range=(n, n), stop_words='english').fit(corpus)
+    bag_of_words = vec.transform(corpus)
+    sum_words = bag_of_words.sum(axis=0) 
+    words_freq = [(word, sum_words[0, idx]) for word, idx in vec.vocabulary_.items()]
+    words_freq = sorted(words_freq, key = lambda x: x, reverse=True)
+    return words_freq[:top_k]
+
+top_bigrams = get_top_ngrams(processed_comments, n=2, top_k=10)
+print("Top 10 Bigrams:")
+print(pd.DataFrame(top_bigrams, columns=['Bigram', 'Frequency']))
+
+print("\n" + "="*30 + "\n")
+
+top_trigrams = get_top_ngrams(processed_comments, n=3, top_k=10)
+print("Top 10 Trigrams:")
+print(pd.DataFrame(top_trigrams, columns=['Trigram', 'Frequency']))
+
+from wordcloud import WordCloud
+import matplotlib.pyplot as plt
+
+all_comments_text = " ".join(comment for comment in processed_comments)
+
+wordcloud = WordCloud(width=800, height=400, background_color='white', collocations=False).generate(all_comments_text)
+
+plt.figure(figsize=(10, 5))
+plt.imshow(wordcloud, interpolation='bilinear')
+plt.axis("off")
+plt.show()
+
+from wordcloud import WordCloud
+import matplotlib.pyplot as plt
+
+feature_names = vectorizer.get_feature_names_out()
+
+for topic_idx, topic in enumerate(nmf_model.components_):
+    topic_words = {feature_names[i]: topic[i] for i in topic.argsort()[:-50 - 1:-1]}
+    
+    wordcloud = WordCloud(width=800, height=400, background_color='white').generate_from_frequencies(topic_words)
+    
+    plt.figure(figsize=(10, 5))
+    plt.imshow(wordcloud, interpolation='bilinear')
+    plt.title(f'Topic {topic_idx + 1}')
+    plt.axis("off")
+    plt.show()
